@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sms
+from statsmodels.tsa.stattools import adfuller
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -71,6 +72,8 @@ for country_index in [1, 4, 6]:
                 color=(country_index / 6, 0, 1 - country_index / 6))
 sample_countries_name_additional.extend(sample_countries_name)
 plt.legend(['India', 'Ukraine', 'Peru'])
+plt.xlabel('w')
+plt.ylabel('g\'(w)')
 plt.show()
 
 '''
@@ -86,14 +89,20 @@ data_for_regression_y = np.delete(data_for_regression_y, np.where(np.isnan(data_
 data_for_regression_x = data_for_regression_x.reshape(-1, 1)
 data_for_regression_y = data_for_regression_y.reshape(-1, 1)
 
+adfvalues1 = adfuller(data_for_regression_x, 1)
+adfvalues2 = adfuller(data_for_regression_y, 1)
 data_for_regression_x_add = sms.add_constant(data_for_regression_x)
 model = sms.OLS(data_for_regression_y, data_for_regression_x_add).fit()
 summary = model.summary()
 print(summary)
+print('adfuller1=', adfvalues1)
+print('adfuller2=', adfvalues2)
 
 fig_1 = plt.figure(figsize=(8, 4))
 plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
 plt.scatter(data_for_regression_x, data_for_regression_y, c='b')
+plt.xlabel('w')
+plt.ylabel('g\'(w)')
 plt.show()
 
 '''
@@ -126,6 +135,8 @@ print(summary)
 fig_1 = plt.figure(figsize=(8, 4))
 plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
 plt.scatter(x_range_data, y_range_data, c='b')
+plt.xlabel('w')
+plt.ylabel('g\'(w)')
 plt.show()
 
 with open('summary.pkl', 'wb') as fl1:
