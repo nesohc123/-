@@ -7,9 +7,11 @@ with open('model.pkl', 'rb') as fl:
 with open('data_after_step_4.pkl', 'rb') as fl1:
     data = pickle.load(fl1)
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
 
 filename = r"C:\Users\dell\Desktop\IIP_ljq_G函数所需.xlsx"
 China_data = pd.read_excel(filename, index_col=0)
@@ -25,24 +27,19 @@ filename1 = r"C:\Users\dell\Desktop\美国_国债收益率_10年_月_平均值.x
 risk_free_rate = pd.read_excel(filename1, index_col=0)
 
 data['China_U\'(x)_as_developing_country'] = 0
-data['China_U\'(x)_as_developed_country'] = 0
 for index in data.index:
     # 又是一个不用户友好的公式，关于这个公式还是详见论文正文
-    data.loc[index, 'China_U\'(x)_as_developed_country'] = -(
-            data.loc[index, 'port_return_without_short'] - risk_free_rate.loc[
-        index, 'rate'] - 1 / 2 * data.loc[index, 'developed_countries_risk_averse_factor_estimation'] * data.loc[
-                index, 'China_weight'] * data.loc[
-                index, 'port_std_without_short'] ** 2 + model.predict(
-        (1, data.loc[index, 'China_weight'])))
     data.loc[index, 'China_U\'(x)_as_developing_country'] = -(
             data.loc[index, 'port_return_without_short'] - risk_free_rate.loc[
         index, 'rate'] - 1 / 2 * data.loc[index, 'developing_countries_risk_averse_factor_estimation'] * data.loc[
                 index, 'China_weight'] * data.loc[
                 index, 'port_std_without_short'] ** 2 + model.predict(
-        (1, data.loc[index, 'China_weight'])))
+        [[1] + list(data.loc[index, ['China_weight', 'China_Rpre', 'China_rk']])]))
+
 data.index = data.index // 100 + (data.index % 100) / 12
 fig = plt.figure(figsize=(8, 4))
-plt.plot(data.iloc[:, -2], color='b')
 plt.plot(data.iloc[:, -1], color='g')
-plt.legend(data.columns[-2:])
+plt.legend(data.columns[-1:])
+plt.xlabel(r'年份')
+plt.ylabel('U\'(x)')
 plt.show()

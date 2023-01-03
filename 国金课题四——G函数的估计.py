@@ -66,6 +66,32 @@ for index in data.index:
 for i in range(-14, -7, -1):
     data.iloc[:, i] = data.iloc[:, i].rolling(12).mean()
 
+additional_file_1 = r"C:\Users\dell\Desktop\主权评级.xlsx"
+additional_file_2 = r"C:\Users\dell\Desktop\名义有效汇率指数变动.xlsx"
+rank = pd.read_excel(additional_file_1, index_col=0)
+delta_exchange = pd.read_excel(additional_file_2, index_col=0)
+delta_exchange[delta_exchange < 0] = 0
+# 这个mapping有一定的任意性，具体原因见论文正文
+mapping = {'AA-': 1, 'A+': 2, 'A': 3, 'A-': 4, 'BBB+': 5, 'BBB': 6, 'BBB-': 7, 'BB+': 8, 'BB': 9, 'BB-': 10,
+           'B+': 11, 'B': 12, 'B-': 13, 'CCC+': 14, 'CCC': 15, 'CCC-': 16, 'CC+': 17, 'CC': 18}
+for i in mapping.keys():
+    rank[rank == i] = mapping[i]
+
+data_new = pd.concat([data, delta_exchange], axis=1)
+for col in rank.columns:
+    data_new[col] = 0
+for ind in data_new.index:
+    for col in rank.columns:
+        data_new.loc[ind, col] = rank.loc[ind // 100, col]
+country_list = ['Peru', 'India']
+column_list = list(map(lambda x: 'G\'(x)_estimation_' + str(x), country_list)) + \
+              list(map(lambda x: 'weight_' + str(x), country_list)) + \
+              list(map(lambda x: str(x) + '_Rpre', country_list)) + \
+              list(map(lambda x: str(x) + '_rk', country_list))
+
+data_for_model_training = data_new.loc[:, column_list].dropna(how='any')
+
+# 这一小段的作图是为了展示报告的直观性，与实际回归有所差别
 fig = plt.figure(figsize=(8, 4))
 for country_index in [1, 4, 6]:
     plt.scatter(data.iloc[11::12, -country_index - 1], data.iloc[11::12, -country_index - 8],
@@ -79,65 +105,60 @@ plt.show()
 '''
 这里的[1,4,6]是怎么来的呢？最开始是画range(7)，七个国家都画，然后根据散点图把x散度太小的四个国家剔除出去
 '''
+data1 = pd.DataFrame(data_for_model_training.loc[:, ['weight_Peru', 'Peru_Rpre', 'Peru_rk']])
+data1.columns = [1, 2, 3]
+data2 = pd.DataFrame(data_for_model_training.loc[:, ['weight_India', 'India_Rpre', 'India_rk']])
+data2.columns = [1, 2, 3]
+data_for_regression_x = pd.concat([data1, data2], ignore_index=True)
+data3 = pd.DataFrame(data_for_model_training.loc[:, 'G\'(x)_estimation_Peru'])
+data3.columns = ['y']
+data4 = pd.DataFrame(data_for_model_training.loc[:, 'G\'(x)_estimation_India'])
+data4.columns = ['y']
+data_for_regression_y = pd.concat([data3, data4], ignore_index=True)
 
-data_for_regression_x = np.array([data.iloc[11::12, -country_index - 1] for country_index in [1, 4, 6]],
-                                 dtype=np.float32).flatten()
-data_for_regression_y = np.array([data.iloc[11::12, -country_index - 8] for country_index in [1, 4, 6]],
-                                 dtype=np.float32).flatten()
-data_for_regression_x = np.delete(data_for_regression_x, np.where(np.isnan(data_for_regression_x)))
-data_for_regression_y = np.delete(data_for_regression_y, np.where(np.isnan(data_for_regression_y)))
-data_for_regression_x = data_for_regression_x.reshape(-1, 1)
-data_for_regression_y = data_for_regression_y.reshape(-1, 1)
-
-adfvalues1 = adfuller(data_for_regression_x, 1)
-adfvalues2 = adfuller(data_for_regression_y, 1)
+# adfvalues1 = adfuller(data_for_regression_x, 1)
+# adfvalues2 = adfuller(data_for_regression_y, 1)
 data_for_regression_x_add = sms.add_constant(data_for_regression_x)
 model = sms.OLS(data_for_regression_y, data_for_regression_x_add).fit()
 summary = model.summary()
 print(summary)
-print('adfuller1=', adfvalues1)
-print('adfuller2=', adfvalues2)
+# print('adfuller1=', adfvalues1)
+# print('adfuller2=', adfvalues2)
 
-fig_1 = plt.figure(figsize=(8, 4))
-plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
-plt.scatter(data_for_regression_x, data_for_regression_y, c='b')
-plt.xlabel('w')
-plt.ylabel('g\'(w)')
-plt.show()
+# fig_1 = plt.figure(figsize=(8, 4))
+# plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
+# plt.scatter(data_for_regression_x, data_for_regression_y, c='b')
+# plt.xlabel('w')
+# plt.ylabel('g\'(w)')
+# plt.show()
 
 '''
-回归的R^2似乎太小，考虑到可能是某一个x附近有太多散度很大的y，下面进行分段平均化再试一次
+回归的R^2似乎太小，考虑到可能是某一个w附近有太多散度很大的y，下面进行分段平均化再试一次
 '''
 x_mean = np.linspace(0.025, 0.975, 20)
-x_range_data = []
-y_range_data = []
-data_for_regression_x = data_for_regression_x.flatten()
-data_for_regression_y = data_for_regression_y.flatten()
+x_range_data = pd.DataFrame(index=range(20), columns=[1, 2, 3])
+y_range_data = pd.DataFrame(index=range(20), columns=['y'])
+data_for_regression_x_1 = data_for_regression_x.loc[:,1]
 for x in x_mean:
     x_lower = x - 0.025
     x_upper = x + 0.025
-    a = np.where(data_for_regression_x > x_lower)
-    b = np.where(data_for_regression_x < x_upper)
+    a = np.where(data_for_regression_x_1 > x_lower)
+    b = np.where(data_for_regression_x_1 < x_upper)
     condition = np.intersect1d(a, b)
-    x_range_data.append(data_for_regression_x[condition].mean())
-    y_range_data.append(data_for_regression_y[condition].mean())
+    x_range_data.loc[x//0.024, :] = data_for_regression_x.loc[condition, :].mean()
+    y_range_data.loc[x//0.024, :] = data_for_regression_y.loc[condition, :].mean()
 
-x_range_data = np.delete(x_range_data, np.where(np.isnan(x_range_data)))
-y_range_data = np.delete(y_range_data, np.where(np.isnan(y_range_data)))
-x_range_data = np.array(x_range_data).reshape(-1, 1)
-y_range_data = np.array(y_range_data).reshape(-1, 1)
-
-data_for_regression_x_range_add = sms.add_constant(x_range_data)
-model = sms.OLS(y_range_data, data_for_regression_x_range_add).fit()
+data_for_regression_x_range_add = sms.add_constant(x_range_data.dropna())
+model = sms.OLS(y_range_data.dropna().astype(float), data_for_regression_x_range_add.astype(float)).fit()
 summary = model.summary()
 print(summary)
 
 fig_1 = plt.figure(figsize=(8, 4))
-plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
-plt.scatter(x_range_data, y_range_data, c='b')
-plt.xlabel('w')
-plt.ylabel('g\'(w)')
-plt.show()
+# plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
+# plt.scatter(x_range_data, y_range_data, c='b')
+# plt.xlabel('w')
+# plt.ylabel('g\'(w)')
+# plt.show()
 
 with open('summary.pkl', 'wb') as fl1:
     pickle.dump(summary, fl1)
@@ -146,4 +167,4 @@ with open('model.pkl', 'wb') as fl2:
     pickle.dump(model, fl2)
 
 with open('data_after_step_4.pkl', 'wb') as fl3:
-    pickle.dump(data, fl3)
+    pickle.dump(data_new, fl3)
