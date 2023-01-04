@@ -106,9 +106,9 @@ plt.show()
 这里的[1,4,6]是怎么来的呢？最开始是画range(7)，七个国家都画，然后根据散点图把x散度太小的四个国家剔除出去
 '''
 data1 = pd.DataFrame(data_for_model_training.loc[:, ['weight_Peru', 'Peru_Rpre', 'Peru_rk']])
-data1.columns = [1, 2, 3]
+data1.columns = ['x1', 'x2', 'x3']
 data2 = pd.DataFrame(data_for_model_training.loc[:, ['weight_India', 'India_Rpre', 'India_rk']])
-data2.columns = [1, 2, 3]
+data2.columns = ['x1', 'x2', 'x3']
 data_for_regression_x = pd.concat([data1, data2], ignore_index=True)
 data3 = pd.DataFrame(data_for_model_training.loc[:, 'G\'(x)_estimation_Peru'])
 data3.columns = ['y']
@@ -136,9 +136,9 @@ print(summary)
 回归的R^2似乎太小，考虑到可能是某一个w附近有太多散度很大的y，下面进行分段平均化再试一次
 '''
 x_mean = np.linspace(0.025, 0.975, 20)
-x_range_data = pd.DataFrame(index=range(20), columns=[1, 2, 3])
+x_range_data = pd.DataFrame(index=range(20), columns=['x1', 'x2', 'x3'])
 y_range_data = pd.DataFrame(index=range(20), columns=['y'])
-data_for_regression_x_1 = data_for_regression_x.loc[:,1]
+data_for_regression_x_1 = data_for_regression_x.loc[:,'x1']
 for x in x_mean:
     x_lower = x - 0.025
     x_upper = x + 0.025
@@ -153,6 +153,12 @@ model = sms.OLS(y_range_data.dropna().astype(float), data_for_regression_x_range
 summary = model.summary()
 print(summary)
 
+hypothesis = '(x2 = 0), (x3 = 0)'
+f_test = model.f_test(hypothesis)
+print(f_test)
+
+model = sms.OLS(y_range_data.dropna().astype(float), data_for_regression_x_range_add.astype(float).iloc[:,[0,1]]).fit()
+print(model.summary())
 fig_1 = plt.figure(figsize=(8, 4))
 # plt.plot([0, 1], [model.predict(exog=(1, 0)), model.predict(exog=(1, 1))], c='red')
 # plt.scatter(x_range_data, y_range_data, c='b')
