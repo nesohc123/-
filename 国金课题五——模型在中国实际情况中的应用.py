@@ -34,7 +34,7 @@ for index in data.index:
         index, 'rate'] - 1 / 2 * data.loc[index, 'developing_countries_risk_averse_factor_estimation'] * data.loc[
                 index, 'China_weight'] * data.loc[
                 index, 'port_std_without_short'] ** 2 + model.predict(
-        [[1] + list(data.loc[index, ['China_weight', 'China_Rpre', 'China_rk']])]))
+        [[1] + list(data.loc[index, ['China_weight']])]))
 
 data.index = data.index // 100 + (data.index % 100) / 12
 fig = plt.figure(figsize=(8, 4))
